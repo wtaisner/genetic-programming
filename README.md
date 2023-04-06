@@ -12,3 +12,7 @@ https://arxiv.org/pdf/2111.07875.pdf
 - https://www.cs.put.poznan.pl/kkrawiec/wiki/uploads/Zajecia/ProgSynthSlides.pdf   :)
 - https://alfagroup.csail.mit.edu/sites/default/files/documents/program_synthesis_novelty.pdf
 - https://alfagroup.csail.mit.edu/sites/default/files/documents/2021.%20Getting%20a%20Head%20Start%20on%20Program%20Synthesis%20with%20Genetic%20Programming.pdf
+
+## (possibly) useful libraries:
+- https://github.com/moshesipper/tiny_gp
+- https://docs.evotorch.ai/v0.4.1/quickstart/
