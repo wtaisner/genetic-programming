@@ -5,6 +5,7 @@ class SymbolicRegressionProblem(Problem):
 
     def __init__(self, num_variables: int):
         super().__init__(num_variables)
+        print([x / 10. for x in range(-10, 10)])
 
         self.toolbox.register("evaluate", self.evaluate, points=[x / 10. for x in range(-10, 10)])
 
@@ -25,4 +26,5 @@ class SymbolicRegressionProblem(Problem):
 
 if __name__ == "__main__":
     problem = SymbolicRegressionProblem(1)
-    problem.run_evolution()
+    hof, pop, log = problem.run_evolution()
+    problem.print_tree(hof[0])

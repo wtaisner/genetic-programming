@@ -15,6 +15,7 @@ from deap import (
     gp
 )
 
+from custom_algorithms import eaSimple_modified
 from custom_operators import *
 
 
@@ -81,17 +82,17 @@ class Problem(ABC):
     ) -> Tuple:
         pop = self.toolbox.population(n=population_size)
         hof = tools.HallOfFame(1)
-        pop, log = algorithms.eaSimple(
+        pop, log = eaSimple_modified(
             pop,
             self.toolbox,
             cxpb=cxpb,
             mutpb=mutpb,
-            ngen=num_generations,
+            ngen_stop=num_generations,
             stats=self.mstats,
             halloffame=hof,
             verbose=True
         )
-        return pop, log
+        return hof, pop, log
 
     @staticmethod
     def print_tree(individual: gp.PrimitiveTree) -> None:
