@@ -69,8 +69,30 @@ class Problem(ABC):
         self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
         self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
 
+    def calculate_epistasis(self, individual: gp.PrimitiveTree):
+        """
+
+        :param individual:
+        :return:
+        """
+        self.print_tree(individual)
+        nodes, edges, labels = gp.graph(individual)
+        initial_fitness = self.evaluate(individual)
+        print(f"Initial fitness: {initial_fitness}")
+        # TODO: determine how to represent a matrix and calculate and fill it accordingly
+        matrix = np.full([len(nodes), len(nodes)], np.nan)
+        all_operators = list(self.pset.primitives.values())[0]
+
+        for idx, op in enumerate(individual):
+            if isinstance(op, gp.Primitive):
+                for op2 in all_operators:
+                    if op != op2:
+                        tmp_individual = individual
+                        tmp_individual[idx] = op2
+                        print(f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {self.evaluate(tmp_individual)[0]-initial_fitness[0]}")
+
     @abstractmethod
-    def evaluate(self):
+    def evaluate(self, individual: gp.PrimitiveTree):
         pass
 
     def run_evolution(
@@ -117,7 +139,7 @@ class Problem(ABC):
         self.pset.addPrimitive(operator.add, 2)
         self.pset.addPrimitive(operator.mul, 2)
         self.pset.addPrimitive(operator.sub, 2)
-        self.pset.addPrimitive(protected_div, 2)
+        # self.pset.addPrimitive(protected_div, 2)
         self.pset.addPrimitive(operator.neg, 1)
         self.pset.addPrimitive(math.cos, 1)
         self.pset.addPrimitive(math.sin, 1)

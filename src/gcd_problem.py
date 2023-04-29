@@ -32,5 +32,6 @@ class GCDProblem(Problem):
 
 if __name__ == "__main__":
     problem = GCDProblem(2, '../gcd/gcd-edge.csv')
-    hof, pop, log = problem.run_evolution()
-    problem.print_tree(hof[0])
+    problem.calculate_epistasis(problem.toolbox.individual())
+    # hof, pop, log = problem.run_evolution()
+    # problem.print_tree(hof[0])
