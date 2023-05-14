@@ -3,10 +3,12 @@ import operator
 import random
 from abc import ABC, abstractmethod
 from typing import Callable, List, Tuple
-
+from copy import deepcopy
 import matplotlib.pyplot as plt
+import seaborn as sns
 import networkx as nx
 import numpy as np
+import pandas as pd
 from deap import (
     base,
     creator,
@@ -75,21 +77,26 @@ class Problem(ABC):
         :param individual:
         :return:
         """
-        self.print_tree(individual)
-        nodes, edges, labels = gp.graph(individual)
         initial_fitness = self.evaluate(individual)
         print(f"Initial fitness: {initial_fitness}")
         # TODO: determine how to represent a matrix and calculate and fill it accordingly
-        matrix = np.full([len(nodes), len(nodes)], np.nan)
         all_operators = list(self.pset.primitives.values())[0]
-
+        data = []
         for idx, op in enumerate(individual):
             if isinstance(op, gp.Primitive):
                 for op2 in all_operators:
-                    if op != op2:
-                        tmp_individual = individual
-                        tmp_individual[idx] = op2
-                        print(f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {self.evaluate(tmp_individual)[0]-initial_fitness[0]}")
+                    tmp_individual = deepcopy(individual)
+                    tmp_individual[idx] = op2
+                    fitness_change = self.evaluate(tmp_individual)[0] - initial_fitness[0]
+                    print(
+                        f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {fitness_change}")
+                    data.append([f"{idx}_{op.name}", f"{idx}_{op2.name}", fitness_change])
+        df = pd.DataFrame(data, columns=["original_operator", "changed_operator", "fitness_change"])
+        df = df.pivot(index="original_operator", columns="changed_operator", values="fitness_change").fillna(0)
+
+        self.print_tree(individual)
+        sns.heatmap(df, annot=True, cmap="seismic")
+        plt.show()
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
