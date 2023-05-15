@@ -2,23 +2,22 @@ import math
 import operator
 import random
 from abc import ABC, abstractmethod
-from typing import Callable, List, Tuple
 from copy import deepcopy
+from typing import Callable, List, Tuple
+
 import matplotlib.pyplot as plt
-import seaborn as sns
 import networkx as nx
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from deap import (
     base,
     creator,
     tools,
-    algorithms,
     gp
 )
 
 from custom_algorithms import eaSimple_modified
-from custom_operators import *
 
 
 class Problem(ABC):
@@ -60,7 +59,7 @@ class Problem(ABC):
 
         # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu, więc każdy sprawdzacz kodu będzie płakał
         self.toolbox = base.Toolbox()
-        self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=4)
+        self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=5)
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self.toolbox.expr)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("compile", gp.compile, pset=self.pset)
@@ -87,15 +86,17 @@ class Problem(ABC):
                 for op2 in all_operators:
                     tmp_individual = deepcopy(individual)
                     tmp_individual[idx] = op2
-                    fitness_change = self.evaluate(tmp_individual)[0] - initial_fitness[0]
+                    fitness_change = initial_fitness[0] - self.evaluate(tmp_individual)[0]  # TODO: rozważyć min/max fitnessu
                     print(
                         f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {fitness_change}")
-                    data.append([f"{idx}_{op.name}", f"{idx}_{op2.name}", fitness_change])
+                    data.append([f"{idx}_{op.name}", f"{op2.name}", fitness_change])
         df = pd.DataFrame(data, columns=["original_operator", "changed_operator", "fitness_change"])
         df = df.pivot(index="original_operator", columns="changed_operator", values="fitness_change").fillna(0)
 
         self.print_tree(individual)
-        sns.heatmap(df, annot=True, cmap="seismic")
+        sns.heatmap(df, annot=True, cmap="seismic", vmin=-1e6, vmax=1e6)
+        plt.savefig("tmp_heatmap.png", dpi=300)
+
         plt.show()
 
     @abstractmethod
@@ -139,6 +140,7 @@ class Problem(ABC):
         nx.draw_networkx_nodes(g, pos)
         nx.draw_networkx_edges(g, pos)
         nx.draw_networkx_labels(g, pos, labels)
+        plt.savefig("tmp_tree.png", dpi=300)
         plt.show()
         # TODO: może dodać zapis do pliku czy coś
 

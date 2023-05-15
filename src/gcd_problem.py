@@ -5,7 +5,7 @@ from typing import Tuple
 import pandas as pd
 from deap import gp
 
-from src.custom_operators import protected_div
+from src.custom_operators import protected_div, int_gcd
 from src.generic_problem import Problem
 
 
@@ -23,6 +23,7 @@ class GCDProblem(Problem):
         self.pset.addPrimitive(operator.mul, 2)
         self.pset.addPrimitive(operator.sub, 2)
         self.pset.addPrimitive(protected_div, 2)
+        # self.pset.addPrimitive(int_gcd, 2)
 
     def evaluate(self, individual: gp.PrimitiveTree) -> Tuple:
         func = self.toolbox.compile(expr=individual)
@@ -32,6 +33,8 @@ class GCDProblem(Problem):
 
 if __name__ == "__main__":
     problem = GCDProblem(2, '../gcd/gcd-edge.csv')
-    problem.calculate_epistasis(problem.toolbox.individual())
-    # hof, pop, log = problem.run_evolution()
+    # problem.calculate_epistasis(problem.toolbox.individual())
+
+    hof, pop, log = problem.run_evolution()
+    problem.calculate_epistasis(hof[0])
     # problem.print_tree(hof[0])
