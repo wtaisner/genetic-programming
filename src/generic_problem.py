@@ -4,7 +4,6 @@ import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Callable, List, Tuple
-
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -47,17 +46,15 @@ class Problem(ABC):
             for name, func in additional_statistics:
                 self.add_statistics(name, func)
 
-        # można podmienić nazwy, ale chyba worthless
-        # self.pset.renameArguments(ARG0="x")
-        # self.pset.renameArguments(ARG1="y")
-
-        # fitness jest minimalizowany/maksymalizowany w zależności od wag (ujemne = min), wagi muszą być tuplem, może być wiele kryteriów
+        # fitness jest minimalizowany/maksymalizowany w zależności od wag (ujemne = min),
+        # wagi muszą być tuplem, może być wiele kryteriów
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 
         # jak będzie wyglądało pojedyncze rozwiązanie, typ, itp
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin, pset=self.pset)
 
-        # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu, więc każdy sprawdzacz kodu będzie płakał
+        # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu,
+        # więc każdy sprawdzacz kodu będzie płakał
         self.toolbox = base.Toolbox()
         self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=5)
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self.toolbox.expr)
@@ -70,14 +67,14 @@ class Problem(ABC):
         self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
         self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
 
-    def calculate_epistasis(self, individual: gp.PrimitiveTree):
+    def calculate_epistasis(self, individual: gp.PrimitiveTree, **kwargs):
         """
 
         :param individual:
         :return:
         """
-        initial_fitness = self.evaluate(individual)
-        print(f"Initial fitness: {initial_fitness}")
+        initial_fitness = self.evaluate(individual, **kwargs)
+        # print(f"Initial fitness: {initial_fitness}")
         # TODO: determine how to represent a matrix and calculate and fill it accordingly
         all_operators = list(self.pset.primitives.values())[0]
         data = []
@@ -86,18 +83,17 @@ class Problem(ABC):
                 for op2 in all_operators:
                     tmp_individual = deepcopy(individual)
                     tmp_individual[idx] = op2
-                    fitness_change = initial_fitness[0] - self.evaluate(tmp_individual)[0]  # TODO: rozważyć min/max fitnessu
-                    print(
-                        f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {fitness_change}")
+                    fitness_change = round((initial_fitness[0] - self.evaluate(tmp_individual, **kwargs)[0]),
+                                           2)  # TODO: rozważyć min/max fitnessu
+                    # print(
+                    #     f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {fitness_change}")
                     data.append([f"{idx}_{op.name}", f"{op2.name}", fitness_change])
         df = pd.DataFrame(data, columns=["original_operator", "changed_operator", "fitness_change"])
         df = df.pivot(index="original_operator", columns="changed_operator", values="fitness_change").fillna(0)
-
-        self.print_tree(individual)
-        sns.heatmap(df, annot=True, cmap="seismic", vmin=-1e6, vmax=1e6)
-        plt.savefig("tmp_heatmap.png", dpi=300)
-
-        plt.show()
+        # self.print_tree(individual)
+        # sns.heatmap(df, annot=True, cmap="seismic", center=0)
+        # plt.show()
+        return df.to_numpy().sum()
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
@@ -140,7 +136,7 @@ class Problem(ABC):
         nx.draw_networkx_nodes(g, pos)
         nx.draw_networkx_edges(g, pos)
         nx.draw_networkx_labels(g, pos, labels)
-        plt.savefig("tmp_tree.png", dpi=300)
+        # plt.savefig("tmp_tree.png", dpi=300)
         plt.show()
         # TODO: może dodać zapis do pliku czy coś
 

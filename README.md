@@ -1,5 +1,16 @@
 # genetic-programming
 
+## Milestone X - 18.05.2023
+| Example GP tree and heatmap for GCD with absolute loss |
+|--------------------------------------------------------|
+| ![tree](static/tmp_heatmap.png)                        |
+| ![heatmap](static/tmp_tree.png)                        |
+
+We tried to implement the epistasis calculation mechanism with accordance to the papers:
+- [paper one](https://sci-hub.se/10.1109/4235.843491)
+- [paper two](https://sci-hub.se/10.1016/b978-1-55860-356-1.50005-4)
+
+
 ## The Paper
 https://arxiv.org/pdf/2111.07875.pdf
 
