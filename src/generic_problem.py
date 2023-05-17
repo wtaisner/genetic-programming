@@ -3,12 +3,13 @@ import operator
 import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from itertools import product
 from typing import Callable, List, Tuple
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from deap import (
     base,
     creator,
@@ -56,7 +57,7 @@ class Problem(ABC):
         # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu,
         # więc każdy sprawdzacz kodu będzie płakał
         self.toolbox = base.Toolbox()
-        self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=5)
+        self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=3)
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self.toolbox.expr)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("compile", gp.compile, pset=self.pset)
@@ -67,33 +68,68 @@ class Problem(ABC):
         self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
         self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
 
-    def calculate_epistasis(self, individual: gp.PrimitiveTree, **kwargs):
+    def calculate_epistasis(self, individual: gp.PrimitiveTree):
         """
 
         :param individual:
         :return:
         """
-        initial_fitness = self.evaluate(individual, **kwargs)
-        # print(f"Initial fitness: {initial_fitness}")
-        # TODO: determine how to represent a matrix and calculate and fill it accordingly
-        all_operators = list(self.pset.primitives.values())[0]
-        data = []
+        all_operators = list(self.pset.primitives.values())[0]  # get all available operators
+        self.print_tree(individual)
+
+        # pairs to dict, w którym kluczem jest indeks operatora,
+        # a wartością lista par (indeks, operator_oryginalny, operator_zmieniony)
+        pairs = dict()
         for idx, op in enumerate(individual):
-            if isinstance(op, gp.Primitive):
+            if isinstance(op, gp.Primitive):  # exclude terminals
+                pairs[idx] = []
                 for op2 in all_operators:
-                    tmp_individual = deepcopy(individual)
-                    tmp_individual[idx] = op2
-                    fitness_change = round((initial_fitness[0] - self.evaluate(tmp_individual, **kwargs)[0]),
-                                           2)  # TODO: rozważyć min/max fitnessu
-                    # print(
-                    #     f"Idx {idx} Original operator: {op.name}, switched to: {op2.name}, fitness change: {fitness_change}")
-                    data.append([f"{idx}_{op.name}", f"{op2.name}", fitness_change])
-        df = pd.DataFrame(data, columns=["original_operator", "changed_operator", "fitness_change"])
-        df = df.pivot(index="original_operator", columns="changed_operator", values="fitness_change").fillna(0)
-        # self.print_tree(individual)
-        # sns.heatmap(df, annot=True, cmap="seismic", center=0)
-        # plt.show()
-        return df.to_numpy().sum()
+                    if op.name != op2.name:
+                        pairs[idx].append(
+                            [idx, op, op2])  # TODO: jeśli chcesz łatwo debugować, dopisz .name do każdego op*, wywali tylko liczenie fitnessu
+
+        baby_matrices_epistasis = []
+        # robimy produkt kartezjański, żeby uzyskać wszystkie możliwe kombinacje dla wartości w słowniku pairs
+        for comb in product(*pairs.values()):
+            data = []
+            initial_fitness = self.evaluate(individual)[0]
+            # znowu robimy produkt, tym razem dla każdej pary z comb, żeby porównać każdy z każdym
+            for comb_1, comb_2 in product(comb, repeat=2):
+                tmp_individual = deepcopy(individual)
+                idx_1, op_1_original, op_1_changed = comb_1
+                idx_2, op_2_original, op_2_changed = comb_2
+                if idx_1 == idx_2:  # jeśli to ta sama para, to zmieniamy tylko jeden operator
+                    tmp_individual[idx_1] = op_1_changed
+                else:  # jeśli to różne pary, to zmieniamy oba operatory
+                    tmp_individual[idx_1] = op_1_changed
+                    tmp_individual[idx_2] = op_2_changed
+                delta_fitness = initial_fitness - self.evaluate(tmp_individual)[0]
+
+                # trochę z braku pomysłu, ale indeks daję na pałę string, działa to nie ruszajmy niczego :)
+                data.append(
+                    [f"({op_1_original.name}, {op_1_changed.name})", f"({op_2_original.name}, {op_2_changed.name})",
+                     delta_fitness])
+
+            df = pd.DataFrame(data, columns=["comb_1", "comb_2", "fitness_change"])
+            # print(df)
+            epistasis = 0
+            for idx, (comb_1, comb_2, fitness_change) in df.iterrows():
+                if comb_1 == comb_2:  # tutaj pomijamy te same pary
+                    continue
+                else:
+                    # jak sobie odkomentujesz printy to możesz sprawdzić, czy dobre wartości odejmuje (ale musisz też df wyprintować)
+                    # print(comb_1, comb_2)
+                    tmp_epistasis = fitness_change - df.loc[
+                        (df["comb_1"] == comb_1) & (df["comb_2"] == comb_1), "fitness_change"].values[0] \
+                                    - df.loc[
+                                        (df["comb_1"] == comb_2) & (df["comb_2"] == comb_2), "fitness_change"].values[0]
+                    # print(df.loc[(df["comb_1"] == comb_1) & (df["comb_2"] == comb_1), "fitness_change"].values[0])
+                    # print(df.loc[(df["comb_1"] == comb_2) & (df["comb_2"] == comb_2), "fitness_change"].values[0])
+                    # print("-------------------------------")
+                epistasis += tmp_epistasis
+            # w tym momencie epistasis to epistaza małej macierzy
+            baby_matrices_epistasis.append(epistasis)
+        return np.array(baby_matrices_epistasis)
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
