@@ -68,9 +68,45 @@ class Problem(ABC):
         self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
         self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
 
-    def calculate_epistasis(self, individual: gp.PrimitiveTree):
+    def _aggregate(self, baby_matrices_epistasis: np.ndarray, ids, aggr: str):
+        if aggr == 'absolute' or aggr == 'voting':
+            baby_matrices_epistasis = np.around(baby_matrices_epistasis, decimals=5)
+            aggr_matrix = np.sign(baby_matrices_epistasis)
+            ones = np.count_nonzero(aggr_matrix == 1, axis=0)
+            m_ones = np.count_nonzero(aggr_matrix == -1, axis=0)
+            zeros = np.count_nonzero(aggr_matrix == 0, axis=0)
+            aggr_matrix = np.zeros(ones.shape)
+            if aggr == 'absolute':
+                for (x, y), value in np.ndenumerate(aggr_matrix):
+                    if ones[x, y] == len(baby_matrices_epistasis):
+                        aggr_matrix[x, y] = 1
+                    elif m_ones[x, y] == len(baby_matrices_epistasis):
+                        aggr_matrix[x, y] = -1
+                    elif zeros[x, y] == len(baby_matrices_epistasis):
+                        aggr_matrix[x, y] = 0
+                    else:
+                        aggr_matrix[x, y] = np.nan
+            elif aggr == 'voting':
+                for (x, y), value in np.ndenumerate(aggr_matrix):
+                    if ones[x, y] > m_ones[x, y] and ones[x, y] > zeros[x, y]:
+                        aggr_matrix[x, y] = 1
+                    elif zeros[x, y] > m_ones[x, y] and zeros[x, y] > ones[x, y]:
+                        aggr_matrix[x, y] = 0
+                    elif m_ones[x, y] > ones[x, y] and m_ones[x, y] > zeros[x, y]:
+                        aggr_matrix[x, y] = -1
+                    else:
+                        aggr_matrix[x, y] = np.nan
+
+        elif aggr == 'mean':
+            aggr_matrix = np.mean(baby_matrices_epistasis, axis=0)
+        aggr_data = pd.DataFrame(aggr_matrix, index=ids, columns=ids)
+        return aggr_data
+
+    def calculate_epistasis(self, individual: gp.PrimitiveTree, aggr: str = 'absolute', return_all: bool = False):
         """
 
+        :param return_all:
+        :param aggr:
         :param individual:
         :return:
         """
@@ -87,11 +123,13 @@ class Problem(ABC):
                     if op.name != op2.name:
                         pairs[idx].append(
                             [idx, op, op2])  # TODO: jeśli chcesz łatwo debugować, dopisz .name do każdego op*, wywali tylko liczenie fitnessu
-
+        ids, ind = np.unique([i[0] for iis in list(pairs.values()) for i in iis], return_index=True)
+        ids = ids[np.argsort(ind)]
         baby_matrices_epistasis = []
         # robimy produkt kartezjański, żeby uzyskać wszystkie możliwe kombinacje dla wartości w słowniku pairs
         for comb in product(*pairs.values()):
-            data = []
+            zero_data = np.zeros((len(comb), len(comb)))
+            data = pd.DataFrame(zero_data, index=ids, columns=ids)
             initial_fitness = self.evaluate(individual)[0]
             # znowu robimy produkt, tym razem dla każdej pary z comb, żeby porównać każdy z każdym
             for comb_1, comb_2 in product(comb, repeat=2):
@@ -105,31 +143,39 @@ class Problem(ABC):
                     tmp_individual[idx_2] = op_2_changed
                 delta_fitness = initial_fitness - self.evaluate(tmp_individual)[0]
 
-                # trochę z braku pomysłu, ale indeks daję na pałę string, działa to nie ruszajmy niczego :)
-                data.append(
-                    [f"({op_1_original.name}, {op_1_changed.name})", f"({op_2_original.name}, {op_2_changed.name})",
-                     delta_fitness])
+                data.loc[idx_1, idx_2] = delta_fitness
+                data.loc[idx_2, idx_1] = delta_fitness
+            epistasis = data.to_numpy()
+            diag_epistasis = np.array([epistasis.diagonal()])
+            epistasis = epistasis - diag_epistasis
+            epistasis = epistasis - diag_epistasis.T
+            np.fill_diagonal(epistasis, 0)
 
-            df = pd.DataFrame(data, columns=["comb_1", "comb_2", "fitness_change"])
-            # print(df)
-            epistasis = 0
-            for idx, (comb_1, comb_2, fitness_change) in df.iterrows():
-                if comb_1 == comb_2:  # tutaj pomijamy te same pary
-                    continue
-                else:
-                    # jak sobie odkomentujesz printy to możesz sprawdzić, czy dobre wartości odejmuje (ale musisz też df wyprintować)
-                    # print(comb_1, comb_2)
-                    tmp_epistasis = fitness_change - df.loc[
-                        (df["comb_1"] == comb_1) & (df["comb_2"] == comb_1), "fitness_change"].values[0] \
-                                    - df.loc[
-                                        (df["comb_1"] == comb_2) & (df["comb_2"] == comb_2), "fitness_change"].values[0]
-                    # print(df.loc[(df["comb_1"] == comb_1) & (df["comb_2"] == comb_1), "fitness_change"].values[0])
-                    # print(df.loc[(df["comb_1"] == comb_2) & (df["comb_2"] == comb_2), "fitness_change"].values[0])
-                    # print("-------------------------------")
-                epistasis += tmp_epistasis
-            # w tym momencie epistasis to epistaza małej macierzy
             baby_matrices_epistasis.append(epistasis)
-        return np.array(baby_matrices_epistasis)
+        baby_matrices_epistasis = np.array(baby_matrices_epistasis)
+
+        if aggr == 'all':
+            a1 = self._aggregate(baby_matrices_epistasis, ids, 'absolute')
+            a2 = self._aggregate(baby_matrices_epistasis, ids, 'voting')
+            a3 = self._aggregate(baby_matrices_epistasis, ids, 'mean')
+            if return_all:
+                aggr_matrix = np.sign(baby_matrices_epistasis)
+                ones = np.count_nonzero(aggr_matrix == 1, axis=0)
+                m_ones = np.count_nonzero(aggr_matrix == -1, axis=0)
+                zeros = np.count_nonzero(aggr_matrix == 0, axis=0)
+                return baby_matrices_epistasis, a1, a2, a3, ones, zeros, m_ones
+            else:
+                return baby_matrices_epistasis, a1, a2, a3
+
+        a1 = self._aggregate(baby_matrices_epistasis, ids, aggr)
+        if return_all:
+            aggr_matrix = np.sign(baby_matrices_epistasis)
+            ones = np.count_nonzero(aggr_matrix == 1, axis=0)
+            m_ones = np.count_nonzero(aggr_matrix == -1, axis=0)
+            zeros = np.count_nonzero(aggr_matrix == 0, axis=0)
+            return baby_matrices_epistasis, a1, ones, zeros, m_ones
+        else:
+            return baby_matrices_epistasis, a1
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
