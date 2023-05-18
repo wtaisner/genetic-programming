@@ -163,6 +163,9 @@ class Problem(ABC):
                 ones = np.count_nonzero(aggr_matrix == 1, axis=0)
                 m_ones = np.count_nonzero(aggr_matrix == -1, axis=0)
                 zeros = np.count_nonzero(aggr_matrix == 0, axis=0)
+                ones = pd.DataFrame(ones, index=ids, columns=ids)
+                m_ones = pd.DataFrame(m_ones, index=ids, columns=ids)
+                zeros = pd.DataFrame(zeros, index=ids, columns=ids)
                 return baby_matrices_epistasis, a1, a2, a3, ones, zeros, m_ones
             else:
                 return baby_matrices_epistasis, a1, a2, a3
@@ -173,6 +176,9 @@ class Problem(ABC):
             ones = np.count_nonzero(aggr_matrix == 1, axis=0)
             m_ones = np.count_nonzero(aggr_matrix == -1, axis=0)
             zeros = np.count_nonzero(aggr_matrix == 0, axis=0)
+            ones = pd.DataFrame(ones, index=ids, columns=ids)
+            m_ones = pd.DataFrame(m_ones, index=ids, columns=ids)
+            zeros = pd.DataFrame(zeros, index=ids, columns=ids)
             return baby_matrices_epistasis, a1, ones, zeros, m_ones
         else:
             return baby_matrices_epistasis, a1
