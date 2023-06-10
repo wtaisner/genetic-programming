@@ -8,5 +8,13 @@ def protected_div(left, right):
         return 1
 
 
+def maximal(left, right):
+    return max(left, right)
+
+
+def minimal(left, right):
+    return min(left, right)
+
+
 def int_gcd(left, right):
     return int(math.gcd(int(left), int(right)))

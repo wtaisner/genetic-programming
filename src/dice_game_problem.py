@@ -10,8 +10,8 @@ from src.generic_problem import Problem
 
 
 class DiceGameProblem(Problem):
-    def __init__(self, num_variables: int, csv_path: str):
-        super().__init__(num_variables)
+    def __init__(self, num_variables: int, csv_path: str, height: int = 17, init_default: bool = True):
+        super().__init__(num_variables, height, init_default)
         csv_data = pd.read_csv(csv_path, sep=',')
         self.inputs = [[i1, i2] for i1, i2 in zip(csv_data['input1'], csv_data['input2'])]
         self.outputs = list(csv_data['output1'])

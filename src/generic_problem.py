@@ -25,15 +25,18 @@ class Problem(ABC):
     def __init__(
             self,
             num_variables: int,
+            height: int = 17,
+            init_default: bool = True,
             additional_operators: List[Tuple[Callable, int]] = None,
-            additional_statistics: List[Callable] = None
+            additional_statistics: List[Callable] = None,
     ):
         """
 
         :param num_variables:
         """
         self.pset = gp.PrimitiveSet("main", num_variables)
-        self._init_operators()
+        if init_default:
+            self._init_operators()
 
         stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
         stats_size = tools.Statistics(len)
@@ -57,19 +60,19 @@ class Problem(ABC):
         # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu,
         # więc każdy sprawdzacz kodu będzie płakał
         self.toolbox = base.Toolbox()
-        self.toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=3)
+        self.toolbox.register("expr", gp.genGrow, pset=self.pset, min_=1, max_=4)
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self.toolbox.expr)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("compile", gp.compile, pset=self.pset)
         self.toolbox.register("select", tools.selTournament, tournsize=3)
         self.toolbox.register("mate", gp.cxOnePoint)
-        self.toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
+        self.toolbox.register("expr_mut", gp.genFull, min_=0, max_=4)
         self.toolbox.register("mutate", gp.mutUniform, expr=self.toolbox.expr_mut, pset=self.pset)
-        self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
-        self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
+        self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=height))
+        self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=height))
 
     def _aggregate(self, baby_matrices_epistasis: np.ndarray, ids, aggr: str):
-        if aggr == 'absolute' or aggr == 'voting':
+        if aggr == 'absolute' or aggr == 'voting' or aggr == 'voting_mean':
             baby_matrices_epistasis = np.around(baby_matrices_epistasis, decimals=5)
             aggr_matrix = np.sign(baby_matrices_epistasis)
             ones = np.count_nonzero(aggr_matrix == 1, axis=0)
@@ -96,9 +99,27 @@ class Problem(ABC):
                         aggr_matrix[x, y] = -1
                     else:
                         aggr_matrix[x, y] = np.nan
-
+            elif aggr == 'voting_mean':
+                for (x, y), value in np.ndenumerate(aggr_matrix):
+                    if ones[x, y] > m_ones[x, y] and ones[x, y] > zeros[x, y]:
+                        mean_positive, divide = 0, 0
+                        for bm in baby_matrices_epistasis:
+                            if bm[x, y] > 0:
+                                mean_positive += bm[x, y]
+                                divide += 1
+                        aggr_matrix[x, y] = mean_positive / divide
+                    elif zeros[x, y] > m_ones[x, y] and zeros[x, y] > ones[x, y]:
+                        aggr_matrix[x, y] = 0
+                    elif m_ones[x, y] > ones[x, y] and m_ones[x, y] > zeros[x, y]:
+                        mean_negative, divide = 0, 0
+                        for bm in baby_matrices_epistasis:
+                            if bm[x, y] < 0:
+                                mean_negative += bm[x, y]
+                                divide += 1
+                        aggr_matrix[x, y] = mean_negative / divide
         elif aggr == 'mean':
             aggr_matrix = np.mean(baby_matrices_epistasis, axis=0)
+        #aggr_matrix /= np.max(np.abs(aggr_matrix))
         aggr_data = pd.DataFrame(aggr_matrix, index=ids, columns=ids)
         return aggr_data
 
@@ -158,6 +179,7 @@ class Problem(ABC):
             a1 = self._aggregate(baby_matrices_epistasis, ids, 'absolute')
             a2 = self._aggregate(baby_matrices_epistasis, ids, 'voting')
             a3 = self._aggregate(baby_matrices_epistasis, ids, 'mean')
+            a4 = self._aggregate(baby_matrices_epistasis, ids, 'voting_mean')
             if return_all:
                 aggr_matrix = np.sign(baby_matrices_epistasis)
                 ones = np.count_nonzero(aggr_matrix == 1, axis=0)
@@ -166,9 +188,9 @@ class Problem(ABC):
                 ones = pd.DataFrame(ones, index=ids, columns=ids)
                 m_ones = pd.DataFrame(m_ones, index=ids, columns=ids)
                 zeros = pd.DataFrame(zeros, index=ids, columns=ids)
-                return baby_matrices_epistasis, a1, a2, a3, ones, zeros, m_ones
+                return baby_matrices_epistasis, a1, a2, a3, a4, ones, zeros, m_ones
             else:
-                return baby_matrices_epistasis, a1, a2, a3
+                return baby_matrices_epistasis, a1, a2, a3, a4
 
         a1 = self._aggregate(baby_matrices_epistasis, ids, aggr)
         if return_all:
@@ -179,9 +201,22 @@ class Problem(ABC):
             ones = pd.DataFrame(ones, index=ids, columns=ids)
             m_ones = pd.DataFrame(m_ones, index=ids, columns=ids)
             zeros = pd.DataFrame(zeros, index=ids, columns=ids)
-            return baby_matrices_epistasis, a1, ones, zeros, m_ones
+            return baby_matrices_epistasis, a1, ones, zeros, m_ones, self.calculate_coeff(a1)
         else:
-            return baby_matrices_epistasis, a1
+            return baby_matrices_epistasis, a1, self.calculate_coeff(a1)
+
+    def calculate_coeff(self, a):
+        a1 = a.to_numpy()
+        if np.count_nonzero(a1 > 0 & ~np.isnan(a1)):
+            mean_positive = np.nanmean(a1[a1 > 0])
+        else:
+            mean_positive = 0
+        if np.count_nonzero(a1 < 0 & ~np.isnan(a1)):
+            mean_negative = np.nanmean(a1[a1 < 0])
+        else:
+            mean_negative = 0
+        mean = 0.5 * (mean_negative + mean_positive)
+        return mean #TODO: fix the coefficient - it is not the best
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
