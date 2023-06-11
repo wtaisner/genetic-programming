@@ -43,7 +43,7 @@ class Problem(ABC):
         self.mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
         self._init_statistics()
 
-        if additional_statistics is not None:
+        if additional_operators is not None:
             for func, arity in additional_operators:
                 self.add_operator(func, arity)
         if additional_statistics is not None:
@@ -60,7 +60,7 @@ class Problem(ABC):
         # ogólnie każda metoda create/register dodaje jakby nową metodę do obiektu,
         # więc każdy sprawdzacz kodu będzie płakał
         self.toolbox = base.Toolbox()
-        self.toolbox.register("expr", gp.genGrow, pset=self.pset, min_=1, max_=4)
+        self.toolbox.register("expr", gp.genGrow, pset=self.pset, min_=1, max_=10)
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self.toolbox.expr)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("compile", gp.compile, pset=self.pset)
