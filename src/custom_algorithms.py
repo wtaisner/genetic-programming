@@ -20,6 +20,7 @@ def eaSimple_modified(population, toolbox, cxpb, mutpb, ngen_stop, halloffame, s
     :returns: A class:`~deap.tools.Logbook` with the statistics of the
                 evolution
     """
+    best_individuals = []
     logbook = tools.Logbook()
     logbook.header = ['gen', 'nevals'] + (stats.fields if stats else [])
 
@@ -28,6 +29,7 @@ def eaSimple_modified(population, toolbox, cxpb, mutpb, ngen_stop, halloffame, s
     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
+    best_individuals += invalid_ind
 
     halloffame.update(population)
     prev_halloffame = halloffame[0].fitness
@@ -53,12 +55,14 @@ def eaSimple_modified(population, toolbox, cxpb, mutpb, ngen_stop, halloffame, s
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        best_individuals += invalid_ind
 
         # Update the hall of fame with the generated individuals
         halloffame.update(offspring)
         if halloffame[0].fitness <= prev_halloffame:
             gen_no_improv += 1
         else:
+            #best_individuals.append(halloffame[0])
             gen_no_improv = 0
         prev_halloffame = halloffame[0].fitness
 
@@ -72,4 +76,4 @@ def eaSimple_modified(population, toolbox, cxpb, mutpb, ngen_stop, halloffame, s
             print(logbook.stream)
         gen += 1
 
-    return population, logbook
+    return population, logbook, best_individuals

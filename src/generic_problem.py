@@ -117,6 +117,8 @@ class Problem(ABC):
                                 mean_negative += bm[x, y]
                                 divide += 1
                         aggr_matrix[x, y] = mean_negative / divide
+                    else:
+                        aggr_matrix[x, y] = np.nan
         elif aggr == 'mean':
             aggr_matrix = np.mean(baby_matrices_epistasis, axis=0)
         #aggr_matrix /= np.max(np.abs(aggr_matrix))
@@ -201,22 +203,9 @@ class Problem(ABC):
             ones = pd.DataFrame(ones, index=ids, columns=ids)
             m_ones = pd.DataFrame(m_ones, index=ids, columns=ids)
             zeros = pd.DataFrame(zeros, index=ids, columns=ids)
-            return baby_matrices_epistasis, a1, ones, zeros, m_ones, self.calculate_coeff(a1)
+            return baby_matrices_epistasis, a1, ones, zeros, m_ones
         else:
-            return baby_matrices_epistasis, a1, self.calculate_coeff(a1)
-
-    def calculate_coeff(self, a):
-        a1 = a.to_numpy()
-        if np.count_nonzero(a1 > 0 & ~np.isnan(a1)):
-            mean_positive = np.nanmean(a1[a1 > 0])
-        else:
-            mean_positive = 0
-        if np.count_nonzero(a1 < 0 & ~np.isnan(a1)):
-            mean_negative = np.nanmean(a1[a1 < 0])
-        else:
-            mean_negative = 0
-        mean = 0.5 * (mean_negative + mean_positive)
-        return mean #TODO: fix the coefficient - it is not the best
+            return baby_matrices_epistasis, a1
 
     @abstractmethod
     def evaluate(self, individual: gp.PrimitiveTree):
@@ -231,7 +220,7 @@ class Problem(ABC):
     ) -> Tuple:
         pop = self.toolbox.population(n=population_size)
         hof = tools.HallOfFame(1)
-        pop, log = eaSimple_modified(
+        pop, log, best_individuals = eaSimple_modified(
             pop,
             self.toolbox,
             cxpb=cxpb,
@@ -241,10 +230,10 @@ class Problem(ABC):
             halloffame=hof,
             verbose=True
         )
-        return hof, pop, log
+        return hof, pop, log, best_individuals
 
     @staticmethod
-    def print_tree(individual: gp.PrimitiveTree) -> None:
+    def print_tree(individual: gp.PrimitiveTree, save_path: str = None) -> None:
         """
         Create a plot of an individual
         :param individual: instance of gp.PrimitiveTree created with self.toolbox.individual()
@@ -259,6 +248,8 @@ class Problem(ABC):
         nx.draw_networkx_nodes(g, pos)
         nx.draw_networkx_edges(g, pos)
         nx.draw_networkx_labels(g, pos, labels)
+        if save_path is not None:
+            plt.savefig(save_path, dpi=300)
         # plt.savefig("tmp_tree.png", dpi=300)
         plt.show()
         # TODO: może dodać zapis do pliku czy coś

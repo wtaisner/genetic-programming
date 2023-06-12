@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     print('Aggr=voting_mean')
     print(aggr_data_mean)
     max_val = np.max(np.absolute(aggr_data_vm))[0]
-    sns.heatmap(aggr_data_vm, vmin=-max_val, vmax=max_val, annot=True, fmt=".1f", cmap=cmap).set(title='Aggr=voting_mean')
+    sns.heatmap(aggr_data_vm, vmin=-max_val, vmax=max_val, annot=True, fmt=".1f", cmap=cmap, mask=aggr_data_vm.isnull()).set(title='Aggr=voting_mean')
     plt.show()
 
     cmap = plt.cm.get_cmap('OrRd')
@@ -50,6 +51,12 @@ if __name__ == "__main__":
     #plt.savefig('../static/negative.png', dpi=300)
     plt.show()
 
+    labels = (np.asarray([f"p:{one}\n z:{zero}\n n:{mone}\n"
+                          for one, zero, mone in zip(ones.to_numpy().flatten(), zeros.to_numpy().flatten(), m_ones.to_numpy().flatten())])
+              ).reshape(zeros.shape)
+    labels = pd.DataFrame(labels, index=zeros.index, columns=zeros.columns)
+    sns.heatmap(zeros, vmin=0, vmax=v_max, annot=labels, cmap=cmap, fmt='')
+    plt.show()
     # population = problem.toolbox.population(n=1)
     # total_fitness = 0
     # for ind in population:
