@@ -93,12 +93,12 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
 
 
 if __name__ == '__main__':
-    rep = 4  # how many tree we select from one bucket (subgroup)
-    folder_path = '../experiments/gcd'
-    path_csv = 'gcd.csv'  # path to csv
-    max_height = 12  # maximal height of the tree
     problem_name = 'gcd'  # 'gcd', 'dice' or 'automl'
+    rep = 4  # how many tree we select from one bucket (subgroup)
+    folder_path = f'../experiments/{problem_name}'
+    path_csv = f'{problem_name}.csv'  # path to csv
+    max_height = 12  # maximal height of the tree
     operators = [operator.add, operator.sub, operator.mul, protected_div, minimal, maximal]
     operators_subgroups = [operators[:i] for i in range(2, len(operators))]
-    experiment_one_problem('gcd', max_height, operators_subgroups, rep=rep, folder_path=folder_path,
+    experiment_one_problem(problem_name, max_height, operators_subgroups, rep=rep, folder_path=folder_path,
                            path_csv=path_csv)
