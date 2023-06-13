@@ -9,8 +9,8 @@ from src.generic_problem import Problem
 
 
 class PossumRegressionProblem(Problem):
-    def __init__(self, num_variables: int, csv_path: str, height: int = 17, init_default: bool = True):
-        super().__init__(num_variables, height, init_default)
+    def __init__(self, num_variables: int, csv_path: str, height: int = 17, length: int = 150, init_default: bool = True):
+        super().__init__(num_variables, height, length, init_default)
         csv_data = pd.read_csv(csv_path, sep=',')
         csv_data = csv_data.drop(columns=["case", "site", "Pop", "sex"], axis=1)
         csv_data.dropna(inplace=True)

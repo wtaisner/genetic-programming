@@ -26,6 +26,7 @@ class Problem(ABC):
             self,
             num_variables: int,
             height: int = 17,
+            length: int = 150,
             init_default: bool = True,
             additional_operators: List[Tuple[Callable, int]] = None,
             additional_statistics: List[Callable] = None,
@@ -70,6 +71,8 @@ class Problem(ABC):
         self.toolbox.register("mutate", gp.mutUniform, expr=self.toolbox.expr_mut, pset=self.pset)
         self.toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=height))
         self.toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=height))
+        self.toolbox.decorate("mate", gp.staticLimit(key=len, max_value=length))
+        self.toolbox.decorate("mutate", gp.staticLimit(key=len, max_value=length))
 
     def _aggregate(self, baby_matrices_epistasis: np.ndarray, ids, aggr: str):
         if aggr == 'absolute' or aggr == 'voting' or aggr == 'voting_mean':

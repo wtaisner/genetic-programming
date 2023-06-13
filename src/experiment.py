@@ -6,6 +6,7 @@ import operator
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from deap import gp
 from matplotlib import pyplot as plt
 
 from gcd_problem import GCDProblem
@@ -18,26 +19,26 @@ warnings.filterwarnings("ignore")
 
 
 # TODO: save trees
-def experiment_one_problem(problem_name: str, max_height: int, operators: List, rep: int, folder_path: str,
+def experiment_one_problem(problem_name: str, max_height: int, max_length: int, max_length_nont, operators: List, rep: int, folder_path: str,
                            path_csv: str):
-    results = {'problem': [], 'op': [], 'height': [], 'rep': [], 'path_baby': [], 'path_img': [], 'path_tree': [], 'mean': [],
+    results = {'problem': [], 'op': [], 'height': [], 'initial_fitness': [], 'nonterminal_nodes': [], 'rep': [], 'path_baby': [], 'path_img': [], 'path_tree': [], 'mean': [],
                'median': [], 'std': [], 'min': [], 'max': []}
     cmap = sns.color_palette("coolwarm", as_cmap=True)
     cmap.set_bad("black")
     for op in operators:
         # print(len(op))
         if problem_name == 'gcd':
-            problem = GCDProblem(2, '../gcd/gcd-edge.csv', height=max_height, init_default=False)  # TODO change path (or not)
+            problem = GCDProblem(2, '../gcd/gcd-edge.csv', height=max_height, length=max_length, init_default=False)  # TODO change path (or not)
         elif problem_name == 'dice':
-            problem = DiceGameProblem(2, '../PSB2/datasets/dice-game/dice-game-edge.csv', height=max_height, init_default=False)  # TODO: change path
+            problem = DiceGameProblem(2, '../PSB2/datasets/dice-game/dice-game-edge.csv', length=max_length, init_default=False)  # TODO: change path
         elif problem_name == 'automl':
-            problem = PossumRegressionProblem(9, "../possum/possum.csv", height=max_height, init_default=False)
+            problem = PossumRegressionProblem(9, "../possum/possum.csv", length=max_length, init_default=False)
         for o in op:
             problem.pset.addPrimitive(o, 2)
         hof, _, _, best_individuals = problem.run_evolution(num_generations=10)  # TODO: change num_generations
-        real_heights = [(i, i.height) for i in best_individuals if i.height > 2]
-        unique_heights = np.unique([i[1] for i in real_heights])
-        mini, maxi = np.min(unique_heights), np.max(unique_heights)
+        real_heights = [(i, i.height, len([j for j in i if isinstance(j, gp.Primitive)])) for i in best_individuals if i.height > 2]
+        unique_len = np.unique([i[2] for i in real_heights if i[2] < max_length_nont])
+        mini, maxi = np.min(unique_len), np.max(unique_len)
         # 4 buckets
         buckets = [[mini + (i - 1) * (maxi - mini) / 4, mini + i * (maxi - mini) / 4] for i in range(1, 5)]
         buckets[0][0] -= 0.1
@@ -45,7 +46,7 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
         subgroups = [[], [], [], []]
         for i, bucket in enumerate(buckets):
             for ind in real_heights:
-                if bucket[0] <= ind[1] < bucket[1]:
+                if bucket[0] <= ind[2] < bucket[1]:
                     subgroups[i].append(ind)
         selected_individuals = []
         for subgroup in subgroups:
@@ -53,16 +54,18 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
             for s in selected:
                 selected_individuals.append(subgroup[s])
         for i, selected in enumerate(selected_individuals):
-            individual, height = selected
-            path_tree = os.path.join(folder_path, f'tree_{problem_name}_{len(op)}_{height}_{i}.png')
+            print(f"{problem_name} Len operators: {len(op)}, i: {i}, all: {len(selected_individuals)}")
+            individual, height, nont_nodes = selected
+            fitness = individual.fitness[0]
+            path_tree = os.path.join(folder_path, f'tree_{problem_name}_{len(op)}_{nont_nodes}_{i}.png')
             problem.print_tree(individual, save_path=path_tree)
             baby_matrices, mean, ones, zeros, m_ones = problem.calculate_epistasis(
                 individual, aggr='voting_mean', return_all=True)
-            path_baby = os.path.join(folder_path, f'babies_{problem_name}_{len(op)}_{height}_{i}.npy')
-            path_img = os.path.join(folder_path, f'plots_{problem_name}_{len(op)}_{height}_{i}.png')
+            path_baby = os.path.join(folder_path, f'babies_{problem_name}_{len(op)}_{height}_{nont_nodes}_{i}.npy')
+            path_img = os.path.join(folder_path, f'plots_{problem_name}_{len(op)}_{height}_{nont_nodes}_{i}.png')
             np.save(path_baby, baby_matrices)
             mean_norm = mean / np.max(np.abs(mean))
-            max_val = np.max(np.absolute(mean_norm))#[0]
+            max_val = np.max(np.absolute(mean_norm))[0]
             figsize = (2*len(mean_norm.index), len(mean_norm.index))
             fig, axes = plt.subplots(1, 2, figsize=figsize)
             sns.heatmap(mean_norm, ax=axes[0], vmin=-max_val, vmax=max_val, annot=True, fmt=".2f", cmap=cmap, mask=mean.isnull())
@@ -80,6 +83,8 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
             results['problem'].append(problem_name)
             results['op'].append(len(op))
             results['height'].append(height)
+            results['initial_fitness'].append(fitness)
+            results['nonterminal_nodes'].append(nont_nodes)
             results['rep'].append(i)
             results['path_baby'].append(path_baby)
             results['path_img'].append(path_img)
@@ -95,20 +100,29 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
 
 if __name__ == '__main__':
     operators = [operator.add, operator.sub, operator.mul, protected_div, minimal, maximal]
-    operators_subgroups = [operators[:i] for i in range(2, len(operators))]
+    operators_subgroups = [operators[:i] for i in range(2, len(operators)+1)]
+    operators_small = [operator.add, operator.sub, operator.mul, protected_div]
+    operators_subgroups_small = [operators[:i] for i in range(2, len(operators)+1)]
+    paths = ['../experiments/gcd', '../experiments/dice', '../experiments/automl', '../experiments/gcd_small', '../experiments/dice_small', '../experiments/automl_small']
+    for path in paths:
+        if not os.path.exists(path):
+            os.mkdir(path)
     args = [
-        ("gcd", 12, operators_subgroups, 4, '../experiments/gcd', 'gcd.csv'),
-        ("dice", 12, operators_subgroups, 4, '../experiments/dice', 'dice.csv'),
-        ("automl", 12, operators_subgroups, 4, '../experiments/automl', 'automl.csv'),
-
+        ("gcd", 12, 150, 20, operators_subgroups, 4, '../experiments/gcd', 'gcd.csv'),
+        ("dice", 12, 150, 20, operators_subgroups, 4, '../experiments/dice', 'dice.csv'),
+        ("automl", 12, 150, 20, operators_subgroups, 4, '../experiments/automl', 'automl.csv'),
+        ("gcd", 12, 100, 15, operators_subgroups_small, 4, '../experiments/gcd_small', 'gcd.csv'),
+        ("dice", 12, 100, 15, operators_subgroups_small, 4, '../experiments/dice_small', 'dice.csv'),
+        ("automl", 12, 100, 15, operators_subgroups_small, 4, '../experiments/automl_small', 'automl.csv'),
     ]
     with mp.Pool(mp.cpu_count()//2) as pool:
         pool.starmap(experiment_one_problem, args)
     # problem_name = 'gcd'  # 'gcd', 'dice' or 'automl'
-    # rep = 4  # how many tree we select from one bucket (subgroup)
+    # rep = 1  # how many tree we select from one bucket (subgroup)
     # folder_path = f'../experiments/{problem_name}'
     # path_csv = f'{problem_name}.csv'  # path to csv
     # max_height = 12  # maximal height of the tree
-    #
-    # experiment_one_problem(problem_name, max_height, operators_subgroups, rep=rep, folder_path=folder_path,
+    # max_length_overall = 50
+    # max_length_nont = 10
+    # experiment_one_problem(problem_name, max_height, max_length_overall, max_length_nont, operators_subgroups, rep=rep, folder_path=folder_path,
     #                        path_csv=path_csv)
