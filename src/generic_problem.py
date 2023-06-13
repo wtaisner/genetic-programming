@@ -134,7 +134,7 @@ class Problem(ABC):
         :return:
         """
         all_operators = list(self.pset.primitives.values())[0]  # get all available operators
-        self.print_tree(individual)
+        # self.print_tree(individual)
 
         # pairs to dict, w którym kluczem jest indeks operatora,
         # a wartością lista par (indeks, operator_oryginalny, operator_zmieniony)
@@ -237,8 +237,10 @@ class Problem(ABC):
         """
         Create a plot of an individual
         :param individual: instance of gp.PrimitiveTree created with self.toolbox.individual()
+        :param save_path
         :return: None
         """
+        fig, ax = plt.subplots()
         nodes, edges, labels = gp.graph(individual)
         g = nx.Graph()
         g.add_nodes_from(nodes)
@@ -250,9 +252,7 @@ class Problem(ABC):
         nx.draw_networkx_labels(g, pos, labels)
         if save_path is not None:
             plt.savefig(save_path, dpi=300)
-        # plt.savefig("tmp_tree.png", dpi=300)
         plt.show()
-        # TODO: może dodać zapis do pliku czy coś
 
     def _init_operators(self):
         self.pset.addPrimitive(operator.add, 2)

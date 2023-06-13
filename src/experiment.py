@@ -1,4 +1,5 @@
 import os
+import multiprocessing as mp
 from typing import List
 
 import operator
@@ -24,11 +25,11 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
     cmap = sns.color_palette("coolwarm", as_cmap=True)
     cmap.set_bad("black")
     for op in operators:
-        print(len(op))
+        # print(len(op))
         if problem_name == 'gcd':
             problem = GCDProblem(2, '../gcd/gcd-edge.csv', height=max_height, init_default=False)  # TODO change path (or not)
         elif problem_name == 'dice':
-            problem = DiceGameProblem(2, '', height=max_height, init_default=False)  # TODO: change path
+            problem = DiceGameProblem(2, '../PSB2/datasets/dice-game/dice-game-edge.csv', height=max_height, init_default=False)  # TODO: change path
         elif problem_name == 'automl':
             problem = PossumRegressionProblem(9, "../possum/possum.csv", height=max_height, init_default=False)
         for o in op:
@@ -61,7 +62,7 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
             path_img = os.path.join(folder_path, f'plots_{problem_name}_{len(op)}_{height}_{i}.png')
             np.save(path_baby, baby_matrices)
             mean_norm = mean / np.max(np.abs(mean))
-            max_val = np.max(np.absolute(mean_norm))[0]
+            max_val = np.max(np.absolute(mean_norm))#[0]
             figsize = (2*len(mean_norm.index), len(mean_norm.index))
             fig, axes = plt.subplots(1, 2, figsize=figsize)
             sns.heatmap(mean_norm, ax=axes[0], vmin=-max_val, vmax=max_val, annot=True, fmt=".2f", cmap=cmap, mask=mean.isnull())
@@ -93,12 +94,21 @@ def experiment_one_problem(problem_name: str, max_height: int, operators: List, 
 
 
 if __name__ == '__main__':
-    problem_name = 'gcd'  # 'gcd', 'dice' or 'automl'
-    rep = 4  # how many tree we select from one bucket (subgroup)
-    folder_path = f'../experiments/{problem_name}'
-    path_csv = f'{problem_name}.csv'  # path to csv
-    max_height = 12  # maximal height of the tree
     operators = [operator.add, operator.sub, operator.mul, protected_div, minimal, maximal]
     operators_subgroups = [operators[:i] for i in range(2, len(operators))]
-    experiment_one_problem(problem_name, max_height, operators_subgroups, rep=rep, folder_path=folder_path,
-                           path_csv=path_csv)
+    args = [
+        ("gcd", 12, operators_subgroups, 4, '../experiments/gcd', 'gcd.csv'),
+        ("dice", 12, operators_subgroups, 4, '../experiments/dice', 'dice.csv'),
+        ("automl", 12, operators_subgroups, 4, '../experiments/automl', 'automl.csv'),
+
+    ]
+    with mp.Pool(mp.cpu_count()//2) as pool:
+        pool.starmap(experiment_one_problem, args)
+    # problem_name = 'gcd'  # 'gcd', 'dice' or 'automl'
+    # rep = 4  # how many tree we select from one bucket (subgroup)
+    # folder_path = f'../experiments/{problem_name}'
+    # path_csv = f'{problem_name}.csv'  # path to csv
+    # max_height = 12  # maximal height of the tree
+    #
+    # experiment_one_problem(problem_name, max_height, operators_subgroups, rep=rep, folder_path=folder_path,
+    #                        path_csv=path_csv)
