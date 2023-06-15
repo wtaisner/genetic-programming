@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 def experiment_one_problem(problem_name: str, max_height: int, max_length: int, max_length_nont, operators: List, rep: int, folder_path: str,
                            path_csv: str):
     results = {'problem': [], 'op': [], 'height': [], 'initial_fitness': [], 'nonterminal_nodes': [], 'rep': [], 'path_baby': [], 'path_img': [], 'path_tree': [], 'mean': [],
-               'median': [], 'std': [], 'min': [], 'max': []}
+               'median': [], 'std': [], 'min': [], 'max': [], 'zero': [], 'positive': [], 'negative': []}
     cmap = sns.color_palette("coolwarm", as_cmap=True)
     cmap.set_bad("black")
     for op in operators:
@@ -56,14 +56,14 @@ def experiment_one_problem(problem_name: str, max_height: int, max_length: int, 
         for i, selected in enumerate(selected_individuals):
             print(f"{problem_name} Len operators: {len(op)}, i: {i}, all: {len(selected_individuals)}")
             individual, height, nont_nodes = selected
-            fitness = individual.fitness[0]
+            fitness = individual.fitness
             path_tree = os.path.join(folder_path, f'tree_{problem_name}_{len(op)}_{nont_nodes}_{i}.png')
             problem.print_tree(individual, save_path=path_tree)
             baby_matrices, mean, ones, zeros, m_ones = problem.calculate_epistasis(
                 individual, aggr='voting_mean', return_all=True)
             path_baby = os.path.join(folder_path, f'babies_{problem_name}_{len(op)}_{height}_{nont_nodes}_{i}.npy')
             path_img = os.path.join(folder_path, f'plots_{problem_name}_{len(op)}_{height}_{nont_nodes}_{i}.png')
-            np.save(path_baby, baby_matrices)
+            #np.save(path_baby, baby_matrices)
             mean_norm = mean / np.max(np.abs(mean))
             max_val = np.max(np.absolute(mean_norm))[0]
             figsize = (2*len(mean_norm.index), len(mean_norm.index))
@@ -88,11 +88,15 @@ def experiment_one_problem(problem_name: str, max_height: int, max_length: int, 
             results['rep'].append(i)
             results['path_baby'].append(path_baby)
             results['path_img'].append(path_img)
-            results['mean'].append(np.mean(mean.to_numpy()))
-            results['median'].append(np.median(mean.to_numpy()))
-            results['std'].append(np.std(mean.to_numpy()))
-            results['max'].append(np.max(mean.to_numpy()))
-            results['min'].append(np.min(mean.to_numpy()))
+            results['mean'].append(np.nanmean(mean.to_numpy()))
+            results['median'].append(np.nanmedian(mean.to_numpy()))
+            results['std'].append(np.nanstd(mean.to_numpy()))
+            results['max'].append(np.nanmax(mean.to_numpy()))
+            results['min'].append(np.nanmin(mean.to_numpy()))
+            c = np.sum(m_ones.to_numpy()) + np.sum(ones.to_numpy()) + np.sum(zeros.to_numpy())
+            results['negative'].append(np.nansum(mean < 0)/(nont_nodes**2))
+            results['positive'].append(np.nansum(mean == 0)/(nont_nodes**2))
+            results['zero'].append(np.nansum(mean > 0)/(nont_nodes**2))
             results['path_tree'].append(path_tree)
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(folder_path, path_csv))
@@ -102,18 +106,18 @@ if __name__ == '__main__':
     operators = [operator.add, operator.sub, operator.mul, protected_div, minimal, maximal]
     operators_subgroups = [operators[:i] for i in range(2, len(operators)+1)]
     operators_small = [operator.add, operator.sub, operator.mul, protected_div]
-    operators_subgroups_small = [operators[:i] for i in range(2, len(operators)+1)]
-    paths = ['../experiments/gcd', '../experiments/dice', '../experiments/automl', '../experiments/gcd_small', '../experiments/dice_small', '../experiments/automl_small']
+    operators_subgroups_small = [operators_small[:i] for i in range(2, len(operators_small)+1)]
+    paths = ['../experiments/gcd_small_all', '../experiments/dice_small_all', '../experiments/automl_small_all', '../experiments/gcd_small', '../experiments/dice_small', '../experiments/automl_small']
     for path in paths:
         if not os.path.exists(path):
             os.mkdir(path)
     args = [
-        ("gcd", 12, 150, 20, operators_subgroups, 4, '../experiments/gcd', 'gcd.csv'),
-        ("dice", 12, 150, 20, operators_subgroups, 4, '../experiments/dice', 'dice.csv'),
-        ("automl", 12, 150, 20, operators_subgroups, 4, '../experiments/automl', 'automl.csv'),
-        ("gcd", 12, 100, 15, operators_subgroups_small, 4, '../experiments/gcd_small', 'gcd.csv'),
-        ("dice", 12, 100, 15, operators_subgroups_small, 4, '../experiments/dice_small', 'dice.csv'),
-        ("automl", 12, 100, 15, operators_subgroups_small, 4, '../experiments/automl_small', 'automl.csv'),
+        # ("gcd", 12, 150, 20, operators_subgroups, 4, '../experiments/gcd', 'gcd.csv'),
+        # ("dice", 12, 150, 20, operators_subgroups, 4, '../experiments/dice', 'dice.csv'),
+        # ("automl", 12, 150, 20, operators_subgroups, 4, '../experiments/automl', 'automl.csv'),
+        ("gcd", 12, 100, 10.5, operators_subgroups_small, 6, '../experiments/gcd_small', 'gcd.csv'),
+        ("dice", 12, 100, 10.5, operators_subgroups_small, 6, '../experiments/dice_small', 'dice.csv'),
+        ("automl", 12, 100, 10.5, operators_subgroups_small, 6, '../experiments/automl_small', 'automl.csv'),
     ]
     with mp.Pool(mp.cpu_count()//2) as pool:
         pool.starmap(experiment_one_problem, args)
